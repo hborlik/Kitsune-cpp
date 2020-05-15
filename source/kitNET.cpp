@@ -2,7 +2,7 @@
 // Created by Yang Bo on 2020/5/11.
 //
 
-#include "../include/KitNET.h"
+#include "../include/kitNET.h"
 
 void KitNET::init() {
     if (kitNetParam == nullptr) {
@@ -22,10 +22,10 @@ void KitNET::init() {
     ensembleLayer = new AE *[featureMap->size()];
     for (int i = 0; i < featureMap->size(); ++i) {
         ensembleLayer[i] = new AE(featureMap->at(i).size(),
-                                  featureMap->at(i).size() * kitNetParam->ensemble_vh_rate,
+                                  std::ceil(featureMap->at(i).size() * kitNetParam->ensemble_vh_rate),
                                   kitNetParam->ensemble_learning_rate);
     }
-    outputLayer = new AE(featureMap->size(), featureMap->size() * kitNetParam->output_vh_rate,
+    outputLayer = new AE(featureMap->size(), std::ceil(featureMap->size() * kitNetParam->output_vh_rate),
                          kitNetParam->output_learning_rate);
 
     // 初始化自编码器输入参数的缓冲区
@@ -34,13 +34,13 @@ void KitNET::init() {
         ensembleInput[i] = new double[featureMap->at(i).size()];
     }
     outputInput = new double[featureMap->size()];
-    /*
+
     for (auto &i : *featureMap) {
         fprintf(stderr, "[");
         for (int j : i)fprintf(stderr, "%d,", j);
         fprintf(stderr, "]\n");
     }
-    */
+
 
     delete kitNetParam;
     kitNetParam = nullptr;

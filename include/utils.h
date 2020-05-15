@@ -131,6 +131,10 @@ inline double sigmoid(double x) {
     return 1.0 / (1.0 + std::exp(-x));
 }
 
+inline double sigmoidDerivative(double fx) {
+    return fx * (1 - fx);
+}
+
 inline double ReLU(double x) {
     return x < 0 ? 0 : x;
 }
@@ -188,7 +192,11 @@ inline double MAE(const double *a, const double *b, int n) {
 
 // 均匀分布
 inline double rand_uniform(double _min, double _max) {
-    std::srand(std::time(NULL));
+    static bool seed = false;
+    if(!seed){// 置一次随机数种子即可
+        std::srand(std::time(NULL));
+        seed = true;
+    }
     return rand() / (RAND_MAX + 0.1) * (_max - _min) + _min;
 }
 

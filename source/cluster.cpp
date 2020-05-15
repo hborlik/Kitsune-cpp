@@ -2,7 +2,7 @@
 // Created by Yang Bo on 2020/5/11.
 //
 
-#include "../include/Cluster.h"
+#include "../include/cluster.h"
 
 Cluster::Cluster(int size) {
     n = size;

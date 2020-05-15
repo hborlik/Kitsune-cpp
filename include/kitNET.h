@@ -6,8 +6,8 @@
 #define KITSUNE_CPP_KITNET_H
 
 #include <vector>
-#include "Autoencoder.h"
-#include "Cluster.h"
+#include "neuralnet.h"
+#include "cluster.h"
 
 
 /**
@@ -90,19 +90,20 @@ public:
 
 
     // 构造器2,参数分别是:
-    // 1. 集成层每个自编码器最大规模,
-    // 2. 训练特征映射需要的实例的个数.
-    // 3. 集成层自编码器显层/隐层比例 4. 输出层自编码器显层/隐层比例, (都默认0.75)
-    // 5. 集成层的学习率   6. 输出层的学习率  (都默认 0.1 )
-    KitNET(int n, int m, int fm_num, double ensemble_vh_rate = 0.75, double output_vh_rate = 0.75,
+    // 1. 输入实例的规模
+    // 2. 集成层每个自编码器最大规模,
+    // 3. 训练特征映射需要的实例的个数.
+    // 4. 集成层自编码器显层/隐层比例 5. 输出层自编码器显层/隐层比例, (都默认0.75)
+    // 6. 集成层的学习率   7. 输出层的学习率  (都默认 0.1 )
+    KitNET(int n, int maxAE, int fm_train_num, double ensemble_vh_rate = 0.75, double output_vh_rate = 0.75,
            double ensemble_learning_rate = 0.1, double output_learning_rate = 0.1) {
         kitNetParam = new KitNETParam;
         kitNetParam->ensemble_learning_rate = ensemble_learning_rate;
         kitNetParam->ensemble_vh_rate = ensemble_vh_rate;
         kitNetParam->output_vh_rate = output_vh_rate;
         kitNetParam->output_learning_rate = output_learning_rate;
-        kitNetParam->max_size = m;
-        kitNetParam->fm_train_num = fm_num;
+        kitNetParam->max_size = maxAE;
+        kitNetParam->fm_train_num = fm_train_num;
         kitNetParam->cluster = new Cluster(n);
     }
 

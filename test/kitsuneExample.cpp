@@ -1,11 +1,15 @@
-#include <iostream>
-#include <ctime>
-#include "include/KitNET.h"
-#include "include/FeatureExtractor.h"
+//
+// Created by Yang Bo on 2020/5/15.
+//
 
-using namespace std;
+#include "../include/featureExtractor.h"
+#include "../include/neuralnet.h"
+#include "../include/kitNET.h"
+#include "test.h"
 
-void testKitsune() {
+// 简单的测试Kitsune的例子
+
+void kitsuneExample() {
     const char *filename = "D:\\Dataset\\KITSUNE\\Mirai\\Mirai_pcap.pcap.tsv";
     const int FM_train_num = 5000; // 训练特征映射需要的个数
     const int AD_train_num = 50000; // 训练异常检测模块需要的个数
@@ -37,15 +41,4 @@ void testKitsune() {
     delete[] x;
     delete fe;
     delete kitNET;
-}
-
-int main() {
-    time_t start_time = time(nullptr);
-
-    testKitsune();
-
-    time_t end_time = time(nullptr);
-
-    cout << "elapsed time: " << end_time - start_time << " s" << endl;
-    return 0;
 }

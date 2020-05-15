@@ -2,7 +2,7 @@
 // Created by Yang Bo on 2020/5/9.
 //
 
-#include "../include/FeatureExtractor.h"
+#include "../include/featureExtractor.h"
 
 
 // netStat使用默认的时间窗口的构造函数, 默认读取的tsv的包特征文件
