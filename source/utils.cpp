@@ -4,19 +4,30 @@
 
 #include "../include/utils.h"
 
+#include <string>
+#include <sstream>
+#include <iostream>
+
 
 FILE *pcap2tcv(const char *filename) {
-    const char *tshark_path = "E:\\wireshark\\tshark.exe";
-    const char *field = "-e frame.time_epoch -e frame.len -e eth.src -e eth.dst -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e udp.srcport -e udp.dstport -e icmp.type -e icmp.code -e arp.opcode -e arp.src.hw_mac -e arp.src.proto_ipv4 -e arp.dst.hw_mac -e arp.dst.proto_ipv4 -e ipv6.src -e ipv6.dst";
-    static char buf[1000];
-    std::sprintf(buf, "%s -r \"%s\" -T fields %s -E header=y -E occurrence=f > \"%s.tsv\"", tshark_path, filename,
-                 field, filename);
-    printf(buf);
+#ifdef WIN32
+    const std::string tshark_path = "E:\\wireshark\\tshark.exe";
+#else
+    const std::string tshark_path = "tshark";
+#endif
+    const std::string field = "-e frame.time_epoch -e frame.len -e eth.src -e eth.dst -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e udp.srcport -e udp.dstport -e icmp.type -e icmp.code -e arp.opcode -e arp.src.hw_mac -e arp.src.proto_ipv4 -e arp.dst.hw_mac -e arp.dst.proto_ipv4 -e ipv6.src -e ipv6.dst";
 
-    std::system(buf);
-    std::sprintf(buf, "%s.tsv", filename);
-    std::printf("\ntshark parsing complete. File saved as: \"%s\"\n", buf);
-    return fopen(buf, "r");
+    std::ostringstream out;
+    out << tshark_path << " -r \"" << filename << "\" -T fields " << field << " -E header=y -E occurrence=f > \"" << filename << ".tsv\"";
+    const std::string buf = out.str();
+    std::cout << buf << std::endl;
+
+
+    std::system(buf.c_str());
+
+    const std::string tsv = std::string(filename) + ".tsv";
+    std::cout << "\ntshark parsing complete. File saved as: " << tsv << std::endl;
+    return fopen(tsv.c_str(), "r");
 }
 
 

@@ -1,7 +1,8 @@
-//
-// Created by Yang Bo on 2020/5/11.
-//
-
+/**
+ * @brief Created by Yang Bo on 2020/5/11.
+ * 
+ * modified: 02/06/2023: comments translated to english
+ */
 #include "../include/cluster.h"
 
 Cluster::Cluster(int size) {
@@ -14,7 +15,7 @@ Cluster::Cluster(int size) {
     for (int i = 0; i < n; ++i)C[i] = new double[n];
     tmp = new double[n];
 
-    // 初始化变量
+    // Initialize variables
     for (int i = 0; i < n; ++i)sum[i] = 0;
     for (int i = 0; i < n; ++i)sum1[i] = 0;
     for (int i = 0; i < n; ++i)sum2[i] = 0;
@@ -38,15 +39,16 @@ void Cluster::update(const double *x) {
 }
 
 std::vector<std::vector<int> > *Cluster::getFeatureMap(int maxSize) {
-    // 获取每个特征的 每个值减去均值的平方和 的 平方根 (计算相关系数的分母)
-    // 保存在tmp里面.
+    // Get the square root of the sum of the squares of each value minus the mean for each feature
+    // (calculates the denominator of the correlation coefficient)
+    // save in tmp.
     for (int i = 0; i < n; ++i) {
         if (sum2[i] <= 0)tmp[i] = 0;
         else tmp[i] = std::sqrt(sum2[i]);
     }
     std::vector<DisNode> dis;
     dis.clear();
-    // 生成距离矩阵(三元组表示),只获取一半矩阵即可
+    // Generate a distance matrix (triple representation), only get half of the matrix
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < i; ++j) {
             double l = tmp[i] * tmp[j];
@@ -56,17 +58,17 @@ std::vector<std::vector<int> > *Cluster::getFeatureMap(int maxSize) {
             dis.emplace_back(i, j, l);
         }
     }
-    // 将矩阵按照距离排序, 每次找到距离最小的两个簇合并
+    // Sort the matrix according to the distance, and find the two clusters with the smallest distance to merge each time
     std::sort(dis.begin(), dis.end());
 
-    std::vector<ClusterNode*> leaf; // 叶节点
+    std::vector<ClusterNode*> leaf; // leaf node
     leaf.clear();
     for (int i = 0; i < n; ++i)leaf.push_back(new ClusterNode(i, 1));
     int now_id = n;
     for (auto edge: dis) {
         ClusterNode *root1 = leaf[edge.id1]->getRoot();
         ClusterNode *root2 = leaf[edge.id2]->getRoot();
-        // 当两个不在一个簇的时候,就合并,生成一个新的节点
+        // When the two are not in the same cluster, they are merged to generate a new node
         if (root1 != root2) {
             auto *root = new ClusterNode(now_id++, root1->size + root2->size);
             root1->fa = root;
@@ -75,12 +77,12 @@ std::vector<std::vector<int> > *Cluster::getFeatureMap(int maxSize) {
             root->rson = root2;
         }
     }
-    // 合并之后,所有的一定在一棵树上,也就是获得了树状图
+    // After merging, all must be on one tree, that is, a dendrogram is obtained
     ClusterNode *root = leaf.back()->getRoot();
-    // 将树状图切开,分成多个簇,每个簇不超过maxSize;
+    // Cut the dendrogram into multiple clusters, and each cluster does not exceed maxSize;
     auto *ans = new std::vector<std::vector<int> >();
     root->getSon(ans, maxSize);
-    // 释放树状图的内存
+    // Free up the memory of the dendrogram
     delete root;
     return ans;
 }
@@ -95,21 +97,23 @@ Cluster::~Cluster() {
 }
 
 void ClusterNode::getSon(std::vector<std::vector<int>> *result, int max_size) {
-    if (size <= max_size) { // 如果当前的子树个数满足要求,就直接全部放在一个簇
+    if (size <= max_size) { 
+        // If the current number of subtrees meets the requirements, put them all in one cluster directly
         std::vector<int> ans;
         ans.clear();
         pushLeaf(ans);
         result->push_back(ans);
-    }else{ // 否则就分成两个簇,递归判断
-        // 左子树
+    }else{
+        // Otherwise, it is divided into two clusters, and the recursive judgment
+        // left subtree
         lson->getSon(result,max_size);
-        // 右子树
+        // right subtree
         rson->getSon(result,max_size);
     }
 }
 
 void ClusterNode::pushLeaf(std::vector<int> &result) {
-    if (lson == nullptr && rson == nullptr) {//leaf
+    if (lson == nullptr && rson == nullptr) {
         result.push_back(id);
     } else {
         if (lson != nullptr)lson->pushLeaf(result);

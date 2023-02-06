@@ -12,14 +12,14 @@ void aE() {
     const char *filename = "D:\\Dataset\\KITSUNE\\Mirai\\Mirai_pcap.pcap.tsv";
     const char *fea2 = "D:\\Dataset\\KITSUNE\\Mirai\\feature_my.csv";
     const char *fea1 = "D:\\Dataset\\KITSUNE\\Mirai\\feature_Kitsune.csv";
-    const int FM_train_num = 5000; // 训练特征映射需要的个数
-    const int AD_train_num = 50000; // 训练异常检测模块需要的个数
-    const int KitNET_train_num = AD_train_num + FM_train_num;  // 训练KitNET需要的个数
-    const int max_AE = 10; // 自编码器最大的规模
+    const int FM_train_num = 5000; // The number of training feature maps required
+    const int AD_train_num = 50000; // The number of training anomaly detection modules required
+    const int KitNET_train_num = AD_train_num + FM_train_num;  // The number needed to train KitNET
+    const int max_AE = 10; // Autoencoder maximum size
 
-    auto fe = new FE(fea2, FeatureCSV);  // 初始化特征提取模块
+    auto fe = new FE(fea2, FeatureCSV);  // Initialize the feature extraction module
 
-    int sz = fe->getVectorSize(); // 获取特征提取需要的个数
+    int sz = fe->getVectorSize(); // Obtain the number of features required for feature extraction
 
     auto femap1 = new vector<vector<int> >{{42},
                                            {49},
@@ -61,7 +61,7 @@ void aE() {
     auto kitNET = new KitNET(femap2);
     //auto kitNET = new KitNET(sz, max_AE, FM_train_num, 0.75, 0.75, 0.1, 0.1);
 
-    auto *x = new double[sz]; // 初始化存储输入特征向量的缓冲区
+    auto *x = new double[sz]; // Initialize the buffer to store the input feature vectors
 
     FILE *fp = fopen("RMSE.txt", "w");
     int now_packet = 0;
@@ -88,18 +88,18 @@ void aE() {
 
 void testARP() {
     const char *filename = "D:\\Dataset\\KITSUNE\\ARP_MitM\\ARP_MitM_pcap.pcapng.tsv";
-    const int FM_train_num = 10000; // 训练特征映射需要的个数
-    const int AD_train_num = 300000; // 训练异常检测模块需要的个数
-    const int KitNET_train_num = AD_train_num + FM_train_num;  // 训练KitNET需要的个数
-    const int max_AE = 10; // 自编码器最大的规模
+    const int FM_train_num = 10000; // The number of training feature maps required
+    const int AD_train_num = 300000; // The number of training anomaly detection modules required
+    const int KitNET_train_num = AD_train_num + FM_train_num;  // The number needed to train KitNET
+    const int max_AE = 10; // Autoencoder maximum size
 
-    auto fe = new FE(filename, PacketTSV);  // 初始化特征提取模块
+    auto fe = new FE(filename, PacketTSV);  // Initialize the feature extraction module
 
-    int sz = fe->getVectorSize(); // 获取特征提取需要的个数
+    int sz = fe->getVectorSize(); // Get the number required for feature extraction
 
-    auto kitNET = new KitNET(sz, max_AE, FM_train_num); // 初始化kitNET模块
+    auto kitNET = new KitNET(sz, max_AE, FM_train_num); // Initialize the kitNET module
 
-    auto *x = new double[sz]; // 初始化存储输入特征向量的缓冲区
+    auto *x = new double[sz]; // Initialize the buffer to store the input feature vectors
 
     FILE *fp = fopen("RMSE.txt", "w");
     int now_packet = 0;

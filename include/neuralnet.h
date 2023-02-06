@@ -1,6 +1,8 @@
-//
-// Created by Yang Bo on 2020/5/9.
-//
+/**
+ * @brief Created by Yang Bo on 2020/5/9.
+ * 
+ * modified: 02/06/2023: comments translated to english
+ */
 
 #ifndef KITSUNE_CPP_NEURALNET_H
 #define KITSUNE_CPP_NEURALNET_H
@@ -11,72 +13,70 @@
 
 
 /**
- *  简单的全连接网络层
+ *  Simple fully connected network layer
  */
 class Dense {
 private:
-    int n_in;    // 输入规模
+    int n_in;    // input size
 
-    int n_out;    // 输出的规模
+    int n_out;    // output size
 
-    double **W = nullptr; // 连接权重
+    double **W = nullptr; // connection weight
 
-    double *bias = nullptr; // 阈值
+    double *bias = nullptr; // threshold
 
-    double (*activation)(double); // 激活函数的函数指针
+    double (*activation)(double); // function pointer to the activation function
 
-    double (*activationDerivative)(double); // 激活函数的导数的函数指针 (参数是激活函数的函数值)
+    double (*activationDerivative)(double); // function pointer to the derivative of the activation function (parameter is the function value of the activation function)
 
-    double learning_rate; // 学习率
+    double learning_rate; // learning rate
 
-    double *inputValue = nullptr; //保存输入值的临时变量
+    double *inputValue = nullptr; //Temporary variable to hold the input value
 
-    double *outputValue = nullptr; // 保存的输出值的临时变量
+    double *outputValue = nullptr; // Temporary variable to hold the output value
 
 public:
-    // 构造器, 参数是输入的神经元个数, 输出的神经元个数, 激活函数, 激活函数的导数, 学习率(默认0.1)
+    // Constructor, the parameters are the number of input neurons, the number of output neurons, activation function, derivative of activation function, learning rate (default 0.1)
     Dense(int inSize, int outSize, double (*activationFunc)(double), double (*activationDerivativeFunc)(double),
           double lr = 0.1);
 
     ~Dense();
 
-    // 前向传播, 第三个参数表示 是否保存输入输出值的临时变量. (只前向传播的时候就false, 传播完需要bp的时候一定要true)
+    // For forward propagation, the third parameter indicates whether to save the temporary variable of the input and output values. (Only false when forward propagation, must be true when bp is required after propagation)
     void feedForward(const double *input, double *output, bool saveValue = false);
 
-    // 反向传播误差,并把传播给上一层的误差保存到g. g的容量需要为max(n_in,n_out)
+    // Backpropagate the error, and save the error propagated to the previous layer to g. The capacity of g needs to be max(n_in,n_out)
     void BackPropagation(double *g);
 };
 
 
 /**
- *  自编码器类, 通过维护两个全连接层(编码器和解码器)
+ *  Autoencoder class, by maintaining two fully connected layers (encoder and decoder)
  */
 class AE {
 private:
-    int visible_size; // 可见层的大小
+    int visible_size; // The size of the visible layer
 
-    int hidden_size; // 隐层大小
+    int hidden_size; // hidden layer size
 
-    Dense *encoder = nullptr, *decoder = nullptr; // 两层神经网络,编码器和解码器
+    Dense *encoder = nullptr, *decoder = nullptr; // Two-layer neural network, encoder and decoder
 
-    double *min_v = nullptr, *max_v = nullptr; // 0-1归一化需要维护的最大值最小值
+    double *min_v = nullptr, *max_v = nullptr; // 0-1 normalization needs to maintain the maximum and minimum values
 
-    double *tmp_x, *tmp_y, *tmp_z, *tmp_g; // 临时变量
+    double *tmp_x, *tmp_y, *tmp_z, *tmp_g; // Temporary variables
 
-    // 0-1归一化, 结果保存在tmp_x里
+    // 0-1 normalization, the result is saved in tmp_x
     void normalize(const double *x);
 
 public:
-    // 构造函数, 参数是显层,隐层的个数, 学习率, 默认0.01
+    // Constructor, the parameter is the number of visible layer, hidden layer, learning rate, default 0.01
     AE(int v_sz, int h_sz, double _learning_rate = 0.01);
-
-    // 析构函数
     ~AE();
 
-    // 重建, 返回重建的 均根误差
+    // reconstruction, returns the root mean error of the reconstruction
     double reconstruct(const double *x);
 
-    // 训练, 返回重建的 均根误差
+    // training, returns the root mean error of the reconstruction
     double train(const double *x);
 
 };

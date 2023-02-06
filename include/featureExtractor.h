@@ -1,7 +1,8 @@
-//
-// Created by Yang Bo on 2020/5/9.
-//
-
+/**
+ * @brief Created by Yang Bo on 2020/5/9.
+ * 
+ * modified: 02/06/2023: comments translated to english
+ */
 #ifndef KITSUNE_CPP_FEATUREEXTRACTOR_H
 #define KITSUNE_CPP_FEATUREEXTRACTOR_H
 
@@ -10,44 +11,45 @@
 #include "netStat.h"
 
 /**
- *  特征提取的类
- *  目前可以做到:
- *  1. 从pcap提取特征, 获取实例向量
- *  2. 从包的tsv,csv文件读取特征,获取实例向量
- *  3. 直接从实例向量的tsv,csv文件中读取实例向量
- *  下一步做的:
- *  4. 在线抓包, 直接获取每个包的实例向量
+ *  class for feature extraction
+  * Currently can do:
+  * 1. Extract features from pcap and get instance vectors
+  * 2. Read the features from the tsv and csv files of the package, and get the instance vector
+  * 3. Read the instance vector directly from the tsv and csv files of the instance vector
+  * What to do next:
+  * 4. Online packet capture, directly obtain the instance vector of each packet
  */
 
 
-// 枚举类型, 定义的文件类型
+// enumerated type, defined file type
 enum FileType {
     PCAP, PacketTSV, PacketCSV, FeatureCSV, FeatureTSV, OnlineNetDevice
 };
 
-// 负责获取特征向量. 可以从pcap, tsv文件读取, 也可以直接从FeatureCSV等文件类型直接读取一行向量
+// Responsible for obtaining feature vectors. 
+// It can be read from pcap, tsv files, or directly read a line of vectors directly from file types such as FeatureCSV
 class FE {
 private:
     TsvReader *tsvReader = nullptr;
     NetStat *netStat = nullptr;
     FileType fileType; // 当前文件的类型
 public:
-    // netStat使用默认的时间窗口的构造函数, 默认读取的tsv的包特征文件
+    // netStat uses the default time window constructor, and reads the tsv package feature file by default
     FE(const char *filename, FileType ft = PacketTSV);
 
-    // 指定时间窗口的构造函数, 默认读取的tsv的包特征文件
+    // The constructor of the specified time window, the package feature file of the tsv read by default
     FE(const char *filename, const std::vector<double> &lambdas, FileType ft = PacketTSV);
 
-    // 析构函数
+    // destructor
     ~FE() {
         delete tsvReader;
         if (netStat != nullptr)delete netStat;
     }
 
-    // 获取下一个实例向量, 保存在result中
+    // Get the next instance vector and save it in result
     int nextVector(double *result);
 
-    // 返回每次生成的实例向量的大小
+    // Return the size of the instance vector generated each time
     inline int getVectorSize() { return netStat->getVectorSize(); }
 
 };

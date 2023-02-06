@@ -1,16 +1,17 @@
-//
-// Created by Yang Bo on 2020/5/9.
-//
-
+/**
+ * @brief Created by Yang Bo on 2020/5/9.
+ * 
+ * modified: 02/06/2023: comments translated to english
+ */
 #ifndef KITSUNE_CPP_NETSTAT_H
 #define KITSUNE_CPP_NETSTAT_H
 
 
 /**
- *  实现的Kitsune的特征统计算法
- *  此文件包含类: NetStat, IncStat, IncStatCov, IncStatDB
- *  还有两个工具类: QueueFixed(固定大小的队列), Extractor(拉格朗日外推法的计算)
- */
+  * Implemented Kitsune's feature statistics algorithm
+  * This file contains classes: NetStat, IncStat, IncStatCov, IncStatDB
+  * There are two tool classes: QueueFixed (fixed size queue), Extractor (calculation of Lagrange extrapolation method)
+  */
 
 #include <vector>
 #include <string>
@@ -19,112 +20,118 @@
 
 
 /**
- *  一个固定大小的队列, 只循环插入而不删除
+ *  A fixed-size queue that only inserts and does not delete
  */
 class QueueFixed {
 public:
-    // 队列容量, 静态元素
+    // Queue Capacity, Static Elements
     static const int QueueCapacity = 3;
 
 private:
     double array[QueueFixed::QueueCapacity];
-    // 当前插入放置的索引
+    // The index where the current insertion is placed
     int now_index;
-    // 当前元素个数
+    // current number of elements
     int now_size;
 
 public:
-    // 构造器
+
     QueueFixed() {
         now_index = now_size = 0;
     }
 
-    // 插入新元素
+    // insert new element
     void insert(double x);
 
-    // 将队列展开成数组, 复制到arr里面, 返回数组元素个数
+    // Expand the queue into an array, copy it into arr, and return the number of elements in the array
     int unroll(double *arr);
 
-    // 返回最后进入队列的元素
+    // Returns the last element entered into the queue
     double getLast();
 
 };
 
 class Extrapolator {
 private:
-    // 维护两个队列, 其中一个是自变量t, 另一个是函数值 v
+    // Maintain two queues, one of which is the independent variable t and the other is the function value v
     QueueFixed tQ, vQ;
-    // 保存展开后的值
+
+    // Save expanded value
     double tArr[QueueFixed::QueueCapacity];
     double vArr[QueueFixed::QueueCapacity];
 
 public:
-    // 插入新元素
+    // insert new element
     void insert(double t, double v) {
         tQ.insert(t);
         vQ.insert(v);
     }
 
-    // 使用拉格朗日插值预测下一个值
+    // Predict the next value using Lagrangian interpolation
     double predict(double t);
 };
 
 
-class IncStatCov; // 因为交叉引用,所以先声明一下这个类
+class IncStatCov; // Because of cross-references, declare this class first
 
 
 /**
- *  IncStat 为某个具体的流的增量数据统计
+ *  IncStat is the incremental data statistics of a specific stream
  */
 class IncStat {
 private:
-    // 流的衰减因子, 也就是时间窗口列表 的指针
+    // The decay factor of the stream, which is the pointer to the time window list
     std::vector<double> *lambdas;
 
-    // 统计的线性和,平方和,权重的 列表, 其中第i个值对应着第i个时间窗口的统计信息
+    // Statistical linear sum, square sum, and weight list
+    // the i-th value corresponds to the statistical information of the i-th time window
     double *CF1 = nullptr, *CF2 = nullptr, *w = nullptr;
 
-    // 上次的时间戳
+    // last timestamp
     double lastTimestamp;
 
-    // 当前的均值,方差,标准差是不是有效(false需要重新计算)
+    // Is the current mean, variance, and standard deviation valid (when false, needs to be recalculated)
     bool mean_valid, var_valid, std_valid;
 
-    // 是不是类型不同, 如果为真, 用新的时间戳当数据(也是为了计算时间戳的统计信息)
+    // Is the type different? 
+    // If true, use the new timestamp as data (also for calculating timestamp statistics)
     bool isTypeDiff;
 
 public:
-    // 当前流索引的ID
+    // The ID of the current stream index
     std::string ID;
 
-    // 当前的均值,方差,标准差 列表, 第i个值对应着第i个时间窗口的统计信息
+    // The current mean, variance, standard deviation list
+    // the i-th value corresponds to the statistical information of the i-th time window
     double *cur_mean = nullptr, *cur_var = nullptr, *cur_std = nullptr;
 
-    // 与当前流有联系的流的集合
+    // the collection of streams associated with the current stream
     std::vector<IncStatCov *> covs;
 
-    // 构造器, 参数分别是当前流的ID,lambda, 初始化的时间戳, 是否用时间戳做统计信息
+    // Constructor, the parameters are the ID of the current stream, lambda, the initialization timestamp, 
+    // whether to use the timestamp as statistics
     IncStat(const std::string &_ID, std::vector<double> *_lambdas, double init_time = 0, bool isTypediff = false);
 
-    // 析构函数, 要将连边信息的指针内容销毁
+    // Destructor, to destroy the pointer content of the edge information
     ~IncStat();
 
-    // 插入新数据的函数, 参数是 v统计量, t时间戳
+    // A function to insert new data, the parameters are vstatistics, ttimestamp
     void insert(double v, double t = 0);
 
-    // 执行衰减,参数为当前时间戳
+    // Execute decay, the parameter is the current timestamp
     void processDecay(double timestamp);
 
-    // 计算均值
+    // Calculate mean
     void calMean();
 
-    // 计算方差
+    // Calculate the variance
     void calVar();
 
-    // 计算标准差
+    // Calculate standard deviation
     void calStd();
 
-    // 获取全部的一维统计信息, (权值,均值,方差), 并将结果追加到result里面, 返回增加的数据的个数
+    // Get all the one-dimensional statistical information
+    // (weight, mean, variance), and append the result to the result, and return the number of increased data
     int getAll1DStats(double *result);
 };
 
