@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "if_ether.h": "c",
+        "inet.h": "c",
+        "common_kern_user.h": "c",
+        "err.h": "c",
+        "common_defines.h": "c",
+        "errno.h": "c",
+        "common_libbpf.h": "c",
+        "bpf.h": "c",
+        "libbpf.h": "c",
+        "time.h": "c",
+        "caca_conio.h": "c",
+        "bpf_helpers.h": "c"
+    }
+}

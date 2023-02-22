@@ -32,7 +32,7 @@ class FE {
 private:
     TsvReader *tsvReader = nullptr;
     NetStat *netStat = nullptr;
-    FileType fileType; // 当前文件的类型
+    FileType fileType; // the type of the current file
 public:
     // netStat uses the default time window constructor, and reads the tsv package feature file by default
     FE(const char *filename, FileType ft = PacketTSV);
