@@ -12,13 +12,15 @@
 #include <../common/xdp_stats_kern_user.h>
 #endif
 
+#define BPF_STATS_MAP_TYPE BPF_MAP_TYPE_ARRAY
+
 /* Keeps stats per (enum) xdp_action */
-struct bpf_map_def SEC("maps") xdp_stats_map = {
-	.type        = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size    = sizeof(__u32),
-	.value_size  = sizeof(struct datarec),
-	.max_entries = XDP_ACTION_MAX,
-};
+struct bpf_map_def {
+	__uint(type, BPF_STATS_MAP_TYPE);
+	__uint(max_entries, XDP_ACTION_MAX);
+	__type(key, __u32);
+	__type(value, struct datarec);
+} xdp_stats_map SEC(".maps");
 
 static __always_inline
 __u32 xdp_stats_record_action(struct xdp_md *ctx, __u32 action)
@@ -31,12 +33,17 @@ __u32 xdp_stats_record_action(struct xdp_md *ctx, __u32 action)
 	if (!rec)
 		return XDP_ABORTED;
 
-	/* BPF_MAP_TYPE_PERCPU_ARRAY returns a data record specific to current
-	 * CPU and XDP hooks runs under Softirq, which makes it safe to update
-	 * without atomic operations.
-	 */
-	rec->rx_packets++;
-	rec->rx_bytes += (ctx->data_end - ctx->data);
+	if (BPF_STATS_MAP_TYPE == BPF_MAP_TYPE_PERCPU_ARRAY) {
+		/* BPF_MAP_TYPE_PERCPU_ARRAY returns a data record specific to current
+		* CPU and XDP hooks runs under Softirq, which makes it safe to update
+		* without atomic operations.
+		*/
+		rec->rx_packets++;
+		rec->rx_bytes += (ctx->data_end - ctx->data);
+	} else {
+		lock_xadd(&rec->rx_packets, 1);
+		lock_xadd(&rec->rx_bytes, (ctx->data_end - ctx->data));
+	}
 
 	return action;
 }

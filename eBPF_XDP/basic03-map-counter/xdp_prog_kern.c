@@ -1,21 +1,18 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/bpf.h>
+#include <linux/in.h>
 #include <bpf/bpf_helpers.h>
 
+#include <xdp_stats_kern_user.h>
+#include <xdp_stats_kern.h>
 #include "bpf_endian.h"
 #include "parsing_helpers.h"
-#include "common_kern_user.h" /* defines: struct datarec; */
 
 /* Lesson#1: See how a map is defined.
  * - Here an array with XDP_ACTION_MAX (max_)entries are created.
  * - The idea is to keep stats per (enum) xdp_action
  */
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(max_entries, XDP_ACTION_MAX);
-	__type(key, __u32);
-	__type(value, struct datarec);
-} xdp_stats_map SEC(".maps");
+// see xdp_stats_kern.h
 
 /* LLVM maps __sync_fetch_and_add() as a built-in function to the BPF atomic add
  * instruction (that is BPF_STX | BPF_XADD | BPF_W for word sizes)
@@ -27,36 +24,64 @@ struct {
 SEC("xdp")
 int  xdp_stats_func(struct xdp_md *ctx)
 {
+	struct datarec *rec;
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data     = (void *)(long)ctx->data;
-	struct datarec *rec;
-	__u32 key = XDP_PASS; /* XDP_PASS = 2 */
+	int action = XDP_PASS;
 
-	/* Lookup in kernel BPF-side return pointer to actual data record */
-	rec = bpf_map_lookup_elem(&xdp_stats_map, &key);
-	/* BPF kernel-side verifier will reject program if the NULL pointer
-	 * check isn't performed here. Even-though this is a static array where
-	 * we know key lookup XDP_PASS always will succeed.
+	/**
+	 * Parsing strctures 
 	 */
-	if (!rec)
-		return XDP_ABORTED;
-	
-	/* Calculate packet length */
-	__u64 bytes = data_end - data;
 
-	/* Multiple CPUs can access data record. Thus, the accounting needs to
-	 * use an atomic operation.
+	struct ethhdr *eth;
+	struct iphdr *iphdr;
+	struct ipv6hdr *ipv6hdr;
+	struct udphdr *udphdr;
+	struct tcphdr *tcphdr;
+	int eth_type, ip_type;
+	struct hdr_cursor nh = {.pos = data};
+
+	/* Packet parsing in steps: Get each header one at a time, aborting if
+	 * parsing fails. Each helper function does sanity checking (is the
+	 * header type in the packet correct?), and bounds checking.
 	 */
-	lock_xadd(&rec->rx_packets, 1);
-	lock_xadd(&rec->rx_bytes, bytes);
-	/* Assignment#1: Add byte counters
-	* - Hint look at struct xdp_md *ctx (copied below)
-	*
-	* Assignment#3: Avoid the atomic operation
-	* - Hint there is a map type named BPF_MAP_TYPE_PERCPU_ARRAY
-	*/
+	eth_type = parse_ethhdr(&nh, data_end, &eth);
+	if (eth_type < 0) {
+		action = XDP_ABORTED;
+		goto out;
+	}
 
-	return XDP_PASS;
+	if (eth_type == bpf_htons(ETH_P_IP)) {
+		ip_type = parse_iphdr(&nh, data_end, &iphdr);
+	} else if (eth_type == bpf_htons(ETH_P_IPV6)) {
+		ip_type = parse_ip6hdr(&nh, data_end, &ipv6hdr);
+	} else {
+		goto out;
+	}
+
+
+	if (ip_type == IPPROTO_UDP) {
+		if (parse_udphdr(&nh, data_end, &udphdr) < 0) {
+			action = XDP_ABORTED;
+			goto out;
+		}
+		// rewrite destination port
+		// udphdr->dest = bpf_htons(bpf_ntohs(udphdr->dest) - 1);
+	} else if (ip_type == IPPROTO_TCP) {
+		if (parse_tcphdr(&nh, data_end, &tcphdr) < 0) {
+			action = XDP_ABORTED;
+			goto out;
+		}
+		// rewrite destination port
+		// tcphdr->dest = bpf_htons(bpf_ntohs(tcphdr->dest) - 1);
+	} else if (ip_type == IPPROTO_ICMPV6) {
+
+	} else if (ip_type == IPPROTO_ICMP) {
+		
+	}
+
+out:
+	return xdp_stats_record_action(ctx, action);
 }
 
 char _license[] SEC("license") = "GPL";

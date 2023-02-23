@@ -19,9 +19,9 @@ static const char *__doc__ = "XDP loader and stats program\n"
 #include <net/if.h>
 #include <linux/if_link.h> /* depend on kernel-headers installed */
 
+#include <xdp_stats_kern_user.h>
 #include "../common/common_params.h"
 #include "../common/common_user_bpf_xdp.h"
-#include "common_kern_user.h"
 #include "bpf_util.h" /* bpf_num_possible_cpus */
 
 static const char *default_filename = "xdp_prog_kern.o";
@@ -106,7 +106,7 @@ struct record {
 };
 
 struct stats_record {
-	struct record stats[1]; /* Assignment#2: Hint */
+	struct record stats[XDP_ACTION_MAX];
 };
 
 static double calc_period(struct record *r, struct record *p)
@@ -131,15 +131,15 @@ static void stats_print(struct stats_record *stats_rec,
 	double pps; /* packets per sec */
 	double mbps; /* M bytes per sec */
 
-	/* Assignment#2: Print other XDP actions stats  */
+	for (__u32 key = XDP_ABORTED; key < XDP_ACTION_MAX; key++)
 	{
 		char *fmt = 
 			"%-12s %'11lld pkts (%'10.0f pps)"
 			" %'11lld Kbytes (%'6.0f Mbits/s)"
 			" period:%f\n";
-		const char *action = action2str(XDP_PASS);
-		rec  = &stats_rec->stats[0];
-		prev = &stats_prev->stats[0];
+		const char *action = action2str(key);
+		rec  = &stats_rec->stats[key];
+		prev = &stats_prev->stats[key];
 
 		period = calc_period(rec, prev);
 		if (period == 0)
@@ -168,10 +168,12 @@ void map_get_value_array(int fd, __u32 key, struct datarec *value)
 void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
 {
 	/* For percpu maps, userspace gets a value per possible CPU */
-	// unsigned int nr_cpus = bpf_num_possible_cpus();
-	// struct datarec values[nr_cpus];
+	unsigned int nr_cpus = bpf_num_possible_cpus();
+	struct datarec values[nr_cpus];
 
-	fprintf(stderr, "ERR: %s() not impl. see assignment#3", __func__);
+	// for (int i = 0; i < nr_cpus; ++i) {
+	// 	bpf_map_elem
+	// }
 }
 
 static bool map_collect(int fd, __u32 map_type, __u32 key, struct record *rec)
@@ -194,7 +196,7 @@ static bool map_collect(int fd, __u32 map_type, __u32 key, struct record *rec)
 		break;
 	}
 
-	/* Assignment#1: Add byte counters */
+
 	rec->total.rx_packets = value.rx_packets;
 	rec->total.rx_bytes = value.rx_bytes;
 	return true;
@@ -203,10 +205,9 @@ static bool map_collect(int fd, __u32 map_type, __u32 key, struct record *rec)
 static void stats_collect(int map_fd, __u32 map_type,
 			  struct stats_record *stats_rec)
 {
-	/* Assignment#2: Collect other XDP actions stats  */
-	__u32 key = XDP_PASS;
-
-	map_collect(map_fd, map_type, key, &stats_rec->stats[0]);
+	for (__u32 key = XDP_ABORTED; key < XDP_ACTION_MAX; key++) {
+		map_collect(map_fd, map_type, key, &stats_rec->stats[key]);
+	}
 }
 
 static void stats_poll(int map_fd, __u32 map_type, int interval)
@@ -250,7 +251,7 @@ static int __check_map_fd_info(int map_fd, struct bpf_map_info *info,
 	if (map_fd < 0)
 		return EXIT_FAIL;
 
-        /* BPF-info via bpf-syscall */
+	/* BPF-info via bpf-syscall */
 	err = bpf_obj_get_info_by_fd(map_fd, info, &info_len);
 	if (err) {
 		fprintf(stderr, "ERR: %s() can't get info - %s\n",
