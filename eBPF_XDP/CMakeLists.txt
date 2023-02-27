@@ -28,8 +28,8 @@ file(GLOB_RECURSE headers "headers/*.h")
 file(GLOB_RECURSE common_headers "common/*.h")
 file(GLOB_RECURSE common "common/*.h" "common/*.c")
 
-add_executable(eBPF_loader basic03-map-counter/xdp_load_and_stats.c ${headers} ${common_headers} ${common})
+add_executable(eBPF_loader xdp/xdp_load_and_stats.c ${headers} ${common_headers} ${common})
 target_include_directories(eBPF_loader PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/common ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 target_link_libraries(eBPF_loader PUBLIC bpf)
 
-add_subdirectory(basic03-map-counter)
+add_subdirectory(xdp)

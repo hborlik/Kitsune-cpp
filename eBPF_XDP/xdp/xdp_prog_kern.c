@@ -2,17 +2,11 @@
 #include <linux/bpf.h>
 #include <linux/in.h>
 #include <bpf/bpf_helpers.h>
+#include <math.h>
+#include <stdbool.h>
 
-#include <xdp_stats_kern_user.h>
-#include <xdp_stats_kern.h>
 #include "bpf_endian.h"
 #include "parsing_helpers.h"
-
-/* Lesson#1: See how a map is defined.
- * - Here an array with XDP_ACTION_MAX (max_)entries are created.
- * - The idea is to keep stats per (enum) xdp_action
- */
-// see xdp_stats_kern.h
 
 /* LLVM maps __sync_fetch_and_add() as a built-in function to the BPF atomic add
  * instruction (that is BPF_STX | BPF_XADD | BPF_W for word sizes)
@@ -21,16 +15,19 @@
 #define lock_xadd(ptr, val)	((void) __sync_fetch_and_add(ptr, val))
 #endif
 
+#include <xdp_stats_kern_user.h>
+#include <xdp_stats_kern.h>
+
+
 SEC("xdp")
 int  xdp_stats_func(struct xdp_md *ctx)
 {
-	struct datarec *rec;
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data     = (void *)(long)ctx->data;
 	int action = XDP_PASS;
 
 	/**
-	 * Parsing strctures 
+	 * Parsing structures 
 	 */
 
 	struct ethhdr *eth;
@@ -81,6 +78,9 @@ int  xdp_stats_func(struct xdp_md *ctx)
 	}
 
 out:
+	if (inc_stat_insert(12, 15.f, 20.f) < 0)
+		action = XDP_ABORTED;
+
 	return xdp_stats_record_action(ctx, action);
 }
 

@@ -20,6 +20,7 @@ static const char *__doc__ = "XDP loader and stats program\n"
 #include <linux/if_link.h> /* depend on kernel-headers installed */
 
 #include <xdp_stats_kern_user.h>
+#include "xdp_feature_kern_user.h"
 #include "../common/common_params.h"
 #include "../common/common_user_bpf_xdp.h"
 #include "bpf_util.h" /* bpf_num_possible_cpus */
