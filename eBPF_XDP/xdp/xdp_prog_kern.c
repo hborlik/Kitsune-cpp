@@ -37,6 +37,7 @@ int  xdp_stats_func(struct xdp_md *ctx)
 	struct tcphdr *tcphdr;
 	int eth_type, ip_type;
 	struct hdr_cursor nh = {.pos = data};
+	__u64 timestamp = bpf_ktime_get_ns() / 1000000; // milliseconds
 
 	/* Packet parsing in steps: Get each header one at a time, aborting if
 	 * parsing fails. Each helper function does sanity checking (is the
@@ -47,6 +48,7 @@ int  xdp_stats_func(struct xdp_md *ctx)
 		action = XDP_ABORTED;
 		goto out;
 	}
+
 
 	if (eth_type == bpf_htons(ETH_P_IP)) {
 		ip_type = parse_iphdr(&nh, data_end, &iphdr);
@@ -78,7 +80,7 @@ int  xdp_stats_func(struct xdp_md *ctx)
 	}
 
 out:
-	if (inc_stat_insert(12, 15.f, 20.f) < 0)
+	if (inc_stat_insert(12, 15, timestamp) < 0)
 		action = XDP_ABORTED;
 
 	return xdp_stats_record_action(ctx, action);

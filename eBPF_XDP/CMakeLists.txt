@@ -32,4 +32,8 @@ add_executable(eBPF_loader xdp/xdp_load_and_stats.c ${headers} ${common_headers}
 target_include_directories(eBPF_loader PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/common ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 target_link_libraries(eBPF_loader PUBLIC bpf)
 
+add_executable(xdp_tests xdp/test.c ${headers} ${common_headers} ${common})
+target_include_directories(xdp_tests PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/common ${CMAKE_CURRENT_SOURCE_DIR}/headers)
+target_link_libraries(xdp_tests PUBLIC bpf m)
+
 add_subdirectory(xdp)

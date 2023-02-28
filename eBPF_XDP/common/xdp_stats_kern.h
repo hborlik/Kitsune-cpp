@@ -12,6 +12,10 @@
 #include <../common/xdp_stats_kern_user.h>
 #endif
 
+#include <asm-generic/int-ll64.h>
+
+#include <fixed_point.h>
+
 #define BPF_STATS_MAP_TYPE BPF_MAP_TYPE_ARRAY
 
 /* Keeps stats per (enum) xdp_action */
@@ -77,41 +81,51 @@ struct bpf_map_inc_stat {
 } xdp_inc_stat_map SEC(".maps");
 
 
-static float lambdas[] = {5, 3, 1, 0.1, 0.01};
-static const __u32 lambdas_size = sizeof(lambdas)/sizeof(lambdas[0]);
+static int32_t fx_lambdas[] = {5000, 3000, 1000, 100, 10}; // timescales in milliseconds
+static const __u32 lambdas_size = sizeof(fx_lambdas)/sizeof(fx_lambdas[0]);
+static const int32_t fx_w_init = 1 << 0; // smallest fx value
+static const int32_t fx_two = 2 << 16;
+static struct inc_stat default_inc_stat = {
+	.w = {[0 ... INC_STAT_SIZE-1] = fx_w_init}
+};
 
+
+/* key, fixed point value, and timestamp in milliseconds */
 static __always_inline
-int inc_stat_insert(__u32 key, float value, float timestamp) {
+int inc_stat_insert(__u32 key, int32_t fx_value, __u64 timestamp) {
+	int rv = 0;
 	/* Lookup in kernel BPF-side return pointer to actual data record */
 	struct inc_stat *stat = bpf_map_lookup_elem(&xdp_inc_stat_map, &key);
-	bool did_create = false;
 	if (!stat) {
-		struct inc_stat new_inc_stat = {
-			.w = {[0 ... INC_STAT_SIZE-1] = 1e-20}
-		};
-
-		stat = &new_inc_stat;
-		did_create = true;
-	} else {
-		bpf_spin_lock(&stat->lock);
+		bpf_map_update_elem(&xdp_inc_stat_map, &key, &default_inc_stat, BPF_NOEXIST); // return value not important
+		stat = bpf_map_lookup_elem(&xdp_inc_stat_map, &key);
+		if (!stat) {
+			return -1; // The key should exist at this point
+		}
 	}
 
+	bpf_spin_lock(&stat->lock);
 
 	// If isTypeDiff is set, use the time difference as statistics
-	float diff = timestamp - stat->last_t;
+	__u64 diff = timestamp - stat->last_t; // time difference in milliseconds
+	if (diff > 1<<15) {
+		rv = -1; // out of domain of s15p16
+		goto out;
+	}
+	int32_t fx_diff = int_to_s15p16((int)diff);
 	if (stat->isTypeDiff) {
 		if (diff > 0)
-			value = diff;
+			fx_value = diff;
 		else
-			value = 0;
+			fx_value = 0;
 	}
-
 
 	// Decay first
     if (diff > 0) {
+#pragma clang loop unroll(full)
         for (__u32 i = 0; i < lambdas_size; ++i) {
             // Calculate the decay factor
-            float factor = pow(2.0f, -lambdas[i] * diff);
+            int32_t factor = fxpow_s15p16(fx_two, fxmul_s15p16(-fx_lambdas[i], fx_diff));
             stat->CF1[i] *= factor;
             stat->CF2[i] *= factor;
             stat->w[i] *= factor;
@@ -120,17 +134,20 @@ int inc_stat_insert(__u32 key, float value, float timestamp) {
     }
 
 	// update with v
-	for (__u32 i = 0; i < lambdas_size; ++i) stat->CF1[i] += value;
-	for (__u32 i = 0; i < lambdas_size; ++i) stat->CF2[i] += value * value;
+#pragma clang loop unroll(full)
+	for (__u32 i = 0; i < lambdas_size; ++i) stat->CF1[i] += fx_value;
+
+#pragma clang loop unroll(full)
+	for (__u32 i = 0; i < lambdas_size; ++i) stat->CF2[i] += fxmul_s15p16(fx_value, fx_value);
+
+#pragma clang loop unroll(full)
 	for (__u32 i = 0; i < lambdas_size; ++i) ++(stat->w[i]);
 	
-	if (!did_create){
-		bpf_spin_unlock(&stat->lock);
-	} else if (bpf_map_update_elem(&xdp_inc_stat_map, &key, stat, BPF_NOEXIST) != 0) {
-		return -1; // value was probably inserted before we managed to get here
-	}
+	// all exec paths required to unlock
+out:
+	bpf_spin_unlock(&stat->lock);
 
-	return 0;
+	return rv;
 }
 
 

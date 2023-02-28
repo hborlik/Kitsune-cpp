@@ -7,6 +7,7 @@
 #define __XDP_STATS_KERN_USER_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define INC_STAT_SIZE 20
 
@@ -18,13 +19,13 @@ struct datarec {
 
 /* IncStat */
 struct inc_stat {
-    float last_t;
-	float CF1		[INC_STAT_SIZE];
-    float CF2		[INC_STAT_SIZE];
-    float w		    [INC_STAT_SIZE];
-    float cur_std	[INC_STAT_SIZE];
-    float cur_mean	[INC_STAT_SIZE];
-    float cur_var	[INC_STAT_SIZE];
+    __u64   last_t;     // timestamp for last inserted measurement in milliseconds
+	int32_t CF1		    [INC_STAT_SIZE];
+    int32_t CF2		    [INC_STAT_SIZE];
+    int32_t w		    [INC_STAT_SIZE];
+    int32_t cur_std	    [INC_STAT_SIZE];
+    int32_t cur_mean	[INC_STAT_SIZE];
+    int32_t cur_var	    [INC_STAT_SIZE];
     bool  isTypeDiff;
     struct bpf_spin_lock lock;
 };
