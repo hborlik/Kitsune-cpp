@@ -24,6 +24,7 @@ static const char *__doc__ = "XDP loader and stats program\n"
 #include "../common/common_params.h"
 #include "../common/common_user_bpf_xdp.h"
 #include "bpf_util.h" /* bpf_num_possible_cpus */
+#include <fixed_point.h>
 
 static const char *default_filename = "xdp_prog_kern.o";
 static const char *default_progsec = "xdp_stats1";
@@ -156,17 +157,25 @@ static void stats_print(struct stats_record *stats_rec,
 	}
 }
 
+void inc_stat_print(struct inc_stat *inc_stat) {
+	printf("timestamp : %llu ", inc_stat->last_t);
+	for (int i = 0; i < N_INC_STATS; ++i) {
+		printf("%.4f (%i)", s15p16_to_double(inc_stat->CF1[i]), inc_stat->CF1[i]);
+	}
+	printf("\n");
+}
+
 /* BPF_MAP_TYPE_ARRAY */
-void map_get_value_array(int fd, __u32 key, struct datarec *value)
+void map_get_datarec_array(int fd, __u32 key, struct datarec *value)
 {
 	if ((bpf_map_lookup_elem(fd, &key, value)) != 0) {
 		fprintf(stderr,
-			"ERR: bpf_map_lookup_elem failed key:0x%X\n", key);
+			"ERR: datarec bpf_map_lookup_elem failed key:0x%X\n", key);
 	}
 }
 
 /* BPF_MAP_TYPE_PERCPU_ARRAY */
-void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
+void map_get_datarec_percpu_array(int fd, __u32 key, struct datarec *value)
 {
 	/* For percpu maps, userspace gets a value per possible CPU */
 	unsigned int nr_cpus = bpf_num_possible_cpus();
@@ -175,6 +184,13 @@ void map_get_value_percpu_array(int fd, __u32 key, struct datarec *value)
 	// for (int i = 0; i < nr_cpus; ++i) {
 	// 	bpf_map_elem
 	// }
+}
+
+void map_get_inc_stat_hash(int fd, __u32 key, struct inc_stat *value) {
+	if ((bpf_map_lookup_elem(fd, &key, value)) != 0) {
+		fprintf(stderr,
+			"ERR: inc_stat bpf_map_lookup_elem failed key:0x%X\n", key);
+	}
 }
 
 static bool map_collect(int fd, __u32 map_type, __u32 key, struct record *rec)
@@ -186,7 +202,7 @@ static bool map_collect(int fd, __u32 map_type, __u32 key, struct record *rec)
 
 	switch (map_type) {
 	case BPF_MAP_TYPE_ARRAY:
-		map_get_value_array(fd, key, &value);
+		map_get_datarec_array(fd, key, &value);
 		break;
 	case BPF_MAP_TYPE_PERCPU_ARRAY:
 		/* fall-through */
@@ -211,9 +227,16 @@ static void stats_collect(int map_fd, __u32 map_type,
 	}
 }
 
-static void stats_poll(int map_fd, __u32 map_type, int interval)
+static void inc_stats_collect(int map_fd, __u32 map_type,
+			  struct inc_stat *inc_stat)
+{
+	map_get_inc_stat_hash(map_fd, 21, inc_stat);
+}
+
+static void stats_poll(int map_fd, int inc_stat_map_fd, __u32 map_type, int interval)
 {
 	struct stats_record prev, record = { 0 };
+	struct inc_stat inc_stat = { 0 };
 
 	/* Trick to pretty printf with thousands separators use %' */
 	setlocale(LC_NUMERIC, "en_US");
@@ -226,14 +249,17 @@ static void stats_poll(int map_fd, __u32 map_type, int interval)
 
 	/* Get initial reading quickly */
 	stats_collect(map_fd, map_type, &record);
-	usleep(1000000/4);
+	// usleep(1000000/4);
 
 	fflush(stdin);
 	while (1) {
 		prev = record; /* struct copy */
 		stats_collect(map_fd, map_type, &record);
-		stats_print(&record, &prev);
-		sleep(interval);
+		// stats_print(&record, &prev);
+		inc_stats_collect(inc_stat_map_fd, BPF_MAP_TYPE_HASH, &inc_stat);
+		inc_stat_print(&inc_stat);
+		// sleep(interval);
+		usleep(500000);
 		if (exit_condition)
 			break;
 	}
@@ -291,9 +317,11 @@ static int __check_map_fd_info(int map_fd, struct bpf_map_info *info,
 int main(int argc, char **argv)
 {
 	struct bpf_map_info map_expect = { 0 };
+	struct bpf_map_info map_expect_inc_stat = { 0 };
 	struct bpf_map_info info = { 0 };
+	struct bpf_map_info inc_stat_info = { 0 };
 	struct bpf_object *bpf_obj;
-	int stats_map_fd;
+	int stats_map_fd, inc_stats_map_fd;
 	int interval = 2;
 	int err;
 
@@ -347,8 +375,9 @@ int main(int argc, char **argv)
 	err = __check_map_fd_info(stats_map_fd, &info, &map_expect);
 	if (err) {
 		fprintf(stderr, "ERR: map via FD not compatible\n");
-		return err;
+		goto exit;
 	}
+
 	if (verbose) {
 		printf("\nCollecting stats from BPF map\n");
 		printf(" - BPF map (bpf_map_type:%d) id:%d name:%s"
@@ -358,8 +387,34 @@ int main(int argc, char **argv)
 		       );
 	}
 
-	stats_poll(stats_map_fd, info.type, interval);
+	/* Locate map file descriptor for inc_stats */
+	inc_stats_map_fd = find_map_fd(bpf_obj, "xdp_inc_stat_map");
+	if (inc_stats_map_fd < 0) {
+		xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
+		return EXIT_FAIL_BPF;
+	}
 
+	map_expect_inc_stat.key_size	= sizeof(__u32);
+	map_expect_inc_stat.value_size	= sizeof(struct inc_stat);
+	map_expect_inc_stat.max_entries	= INC_STAT_MAX_ENTRIES;
+	err = __check_map_fd_info(inc_stats_map_fd, &inc_stat_info, &map_expect_inc_stat);
+	if (err) {
+		fprintf(stderr, "ERR: inc_stat map via FD not compatible\n");
+		goto exit;
+	}
+
+	if (verbose) {
+		printf("\nCollecting inc_stats from BPF map\n");
+		printf(" - BPF map (bpf_map_type:%d) id:%d name:%s"
+		       " key_size:%d value_size:%d max_entries:%d\n",
+		       inc_stat_info.type, inc_stat_info.id, inc_stat_info.name,
+		       inc_stat_info.key_size, inc_stat_info.value_size, inc_stat_info.max_entries
+		       );
+	}
+
+	stats_poll(stats_map_fd, inc_stats_map_fd, info.type, interval);
+
+exit:
 	err = xdp_link_detach(cfg.ifindex, cfg.xdp_flags, 0);
 	if (err) {
 		fprintf(stderr, "ERR: could not detach program\n");

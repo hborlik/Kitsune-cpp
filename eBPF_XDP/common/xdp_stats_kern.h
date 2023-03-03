@@ -75,18 +75,16 @@ __u32 xdp_stats_record_action(struct xdp_md *ctx, __u32 action)
 */
 struct bpf_map_inc_stat {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 100);
+	__uint(max_entries, INC_STAT_MAX_ENTRIES);
 	__type(key, __u32);
 	__type(value, struct inc_stat);
 } xdp_inc_stat_map SEC(".maps");
 
 
-static int32_t fx_lambdas[] = {5000, 3000, 1000, 100, 10}; // timescales in milliseconds
-static const __u32 lambdas_size = sizeof(fx_lambdas)/sizeof(fx_lambdas[0]);
 static const int32_t fx_w_init = 1 << 0; // smallest fx value
 static const int32_t fx_two = 2 << 16;
-static struct inc_stat default_inc_stat = {
-	.w = {[0 ... INC_STAT_SIZE-1] = fx_w_init}
+static const struct inc_stat default_inc_stat = {
+	.w = {[0 ... N_INC_STATS-1] = fx_w_init}
 };
 
 
@@ -96,23 +94,27 @@ int inc_stat_insert(__u32 key, int32_t fx_value, __u64 timestamp) {
 	int rv = 0;
 	/* Lookup in kernel BPF-side return pointer to actual data record */
 	struct inc_stat *stat = bpf_map_lookup_elem(&xdp_inc_stat_map, &key);
+	bool did_create = false;
 	if (!stat) {
 		bpf_map_update_elem(&xdp_inc_stat_map, &key, &default_inc_stat, BPF_NOEXIST); // return value not important
 		stat = bpf_map_lookup_elem(&xdp_inc_stat_map, &key);
+		did_create = true;
 		if (!stat) {
 			return -1; // The key should exist at this point
 		}
 	}
 
 	bpf_spin_lock(&stat->lock);
+	if (did_create) {
+		stat->last_t = timestamp;
+		for (__u32 i = 0; i < N_INC_STATS; ++i) {
+			stat->CF1[i] = fx_value;
+		}
+	}
 
 	// If isTypeDiff is set, use the time difference as statistics
-	__u64 diff = timestamp - stat->last_t; // time difference in milliseconds
-	if (diff > 1<<15) {
-		rv = -1; // out of domain of s15p16
-		goto out;
-	}
-	int32_t fx_diff = int_to_s15p16((int)diff);
+	__u64 diff = (timestamp - stat->last_t) / 1000 / 10; // time difference in centiseconds
+
 	if (stat->isTypeDiff) {
 		if (diff > 0)
 			fx_value = diff;
@@ -123,28 +125,28 @@ int inc_stat_insert(__u32 key, int32_t fx_value, __u64 timestamp) {
 	// Decay first
     if (diff > 0) {
 #pragma clang loop unroll(full)
-        for (__u32 i = 0; i < lambdas_size; ++i) {
+        for (__u32 i = 0; i < N_INC_STATS; ++i) {
             // Calculate the decay factor
-            int32_t factor = fxpow_s15p16(fx_two, fxmul_s15p16(-fx_lambdas[i], fx_diff));
-            stat->CF1[i] *= factor;
-            stat->CF2[i] *= factor;
-            stat->w[i] *= factor;
+			int32_t fx_t 		= div_s15p16(int_to_s15p16(diff), -fx_lambdas[i]);
+            int32_t fx_factor 	= fixed_pow_s15p16(fx_two, fx_t);
+            stat->CF1[i] 	= mul_s15p16(fx_factor, stat->CF1[i]);
+            stat->CF2[i] 	= mul_s15p16(fx_factor, stat->CF2[i]);
+            stat->w[i] 		= mul_s15p16(fx_factor, stat->CF2[i]);
         }
         stat->last_t = timestamp;
     }
 
 	// update with v
 #pragma clang loop unroll(full)
-	for (__u32 i = 0; i < lambdas_size; ++i) stat->CF1[i] += fx_value;
+	for (__u32 i = 0; i < N_INC_STATS; ++i) stat->CF1[i] += fx_value;
 
 #pragma clang loop unroll(full)
-	for (__u32 i = 0; i < lambdas_size; ++i) stat->CF2[i] += fxmul_s15p16(fx_value, fx_value);
+	for (__u32 i = 0; i < N_INC_STATS; ++i) stat->CF2[i] += mul_s15p16(fx_value, fx_value);
 
 #pragma clang loop unroll(full)
-	for (__u32 i = 0; i < lambdas_size; ++i) ++(stat->w[i]);
+	for (__u32 i = 0; i < N_INC_STATS; ++i) ++(stat->w[i]);
 	
 	// all exec paths required to unlock
-out:
 	bpf_spin_unlock(&stat->lock);
 
 	return rv;

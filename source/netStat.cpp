@@ -367,8 +367,8 @@ NetStat::NetStat() {
 // The main call function, pass in a package information, and return the corresponding statistical vector
 // The parameters are: source MAC, destination MCA, source IP, IP protocol type, destination IP, destination IP protocol type, packet size, packet timestamp
 int NetStat::updateAndGetStats(const std::string &srcMAC, const std::string &dstMAC,
-                               const std::string &srcIP, const std::string &srcProtocol,
-                               const std::string &dstIP, const std::string &dstProtocol,
+                               const std::string &srcIP, const std::string &srcPort,
+                               const std::string &dstIP, const std::string &dstPort,
                                double datagramSize, double timestamp, double *result) {
 
     int offset = 0; // The offset of the array (the number currently placed)
@@ -385,10 +385,10 @@ int NetStat::updateAndGetStats(const std::string &srcMAC, const std::string &dst
 
     // Host-Host BW: Statistics of the sending flow of the source IP port (one-dimensional relationship) The sending behavior relationship between the source IP port and the destination IP port (two-dimensional relationship)
     // If it is not a tcp/udp package, let the mac address be the key value of the stream
-    if (srcProtocol == "arp") {
+    if (srcPort == "arp") {
         offset += HT_Hp->updateGet1D2DStats(srcMAC, dstMAC, timestamp, datagramSize, result + offset);
     } else {
-        offset += HT_Hp->updateGet1D2DStats(srcIP + srcProtocol, dstIP + dstProtocol, timestamp,
+        offset += HT_Hp->updateGet1D2DStats(srcIP + srcPort, dstIP + dstPort, timestamp,
                                             datagramSize, result + offset);
     }
     return offset;

@@ -220,18 +220,22 @@ public:
         lambdas = l;
     }
 
-    // 更新指定流的一维信息, 并将统计值[weight,mean,std]追加到result里, 返回增加的数据的个数
+    // Update the one-dimensional information of the specified stream, and append 
+    // the statistical value [weight, mean, std] to the result, and return the number of increased data
     int updateGet1DStats(const std::string &ID, double t, double v, double *result,
                          bool isTypeDiff = false);
 
-    // 更新指定流的二维信息,将[radius,magnitude,cov,pcc]添加到结果里面
-    // 参数分别是: 第一个流的ID,第二个流的ID, 第一个流的统计信息,时间戳, 结果的数组的指针, 返回增加的数据的个数
+    // Update the two-dimensional information of the specified stream, and add [radius, magnitude, cov, pcc] to the result
+     // The parameters are: ID of the first stream, ID of the second stream, statistical information of the
+     // first stream, timestamp, pointer to the result array, and the number of returned data
     int updateGet2DStats(const std::string &ID1, const std::string &ID2, double t1, double v1,
                          double *result, bool isTypediff = false);
 
-    // 更新指定流的一维,二维信息, 将一维的[ weight,mean,std]和二维的[radius,magnitude,cov,pcc]返回
-    // 参数分别是: 流的ID, 时间戳, 统计数据, 结果数组的指针, 最后一个如果设置true,就用时间戳作为统计数据
-    // 返回增加的数据的个数
+    // Update the one-dimensional and two-dimensional information of the specified stream, 
+    // and return the one-dimensional [weight, mean, std] and two-dimensional [radius, magnitude, cov, pcc]
+     // The parameters are: stream ID, timestamp, statistical data, pointer to the result array, 
+     // and if the last one is set to true, the timestamp will be used as statistical data
+     // Return the number of added data
     int updateGet1D2DStats(const std::string &ID1, const std::string &ID2, double t1,
                            double v1, double *result, bool isTypediff = false) {
         int offset = updateGet1DStats(ID1, t1, v1, result, isTypediff);
@@ -262,11 +266,17 @@ class NetStat {
 private:
     // 时间窗口
     std::vector<double> lambdas;
-    // 统计四类流的信息,
-    //1. HT_jit: 主机与主机之间的抖动统计 只统计1维 (3个特征)
-    //2. HT_MI: MAC-IP发送流的关系统计  只统计1维 (3个特征)
-    //3. HT_H: 维护源主机发送流的一维带宽统计和与目的主机发送流之间的二维统计
-    //4. HT_Hp: 维护源主机端口发送流的一维带宽统计和与目的主机端口发送流之间的二维统计 (7个特征), 这个与上面的HT_H不同是键值是ip+port, 考虑每个端口
+    // Statistical information about the four types of streams,
+     //1. HT_jit: The jitter statistics between the host and the host 
+     //     only counts 1 dimension (3 features)
+     //2. HT_MI: Statistics about the relationship between MAC-IP sending streams, 
+     //     only counting 1 dimension (3 features)
+     //3. HT_H: Maintain the one-dimensional bandwidth statistics of the flow sent by 
+     //     the source host and the two-dimensional statistics of the flow sent by the destination host
+     //4. HT_Hp: Maintain the one-dimensional bandwidth statistics of the flow sent by 
+     //     the source host port and the two-dimensional statistics (7 features) between 
+     //     the flow sent by the source host port and the destination host port. 
+     //     This is different from the above HT_H in that the key value is ip+port, Consider each port
     IncStatDB *HT_jit = nullptr, *HT_MI = nullptr, *HT_H = nullptr, *HT_Hp = nullptr;
 
 public:
@@ -276,14 +286,14 @@ public:
     // 无参构造器, 使用默认的lambdas
     NetStat();
 
-    // 主要的调用函数, 传进去一个包信息, 返回对应的统计向量
-    // 参数分别是: 源MAC,目的MCA,源IP, IP协议类型, 目的IP, 目的IP协议类型, 数据包大小, 数据包时间戳
+    // The main call function, pass in a package information, and return the corresponding statistical vector
+     // The parameters are: source MAC, destination MCA, source IP, IP protocol type, destination IP, destination IP protocol type, packet size, packet timestamp
     int updateAndGetStats(const std::string &srcMAC, const std::string &dstMAC,
                           const std::string &srcIP, const std::string &srcProtocol,
                           const std::string &dstIP, const std::string &dstProtocol,
                           double datagramSize, double timestamp, double *result);
 
-    // 返回生成的统计实例向量的维度, 当前是每个lambda对应20个特征
+    // Return the dimension of the generated statistical instance vector, currently each lambda corresponds to 20 features
     int getVectorSize() { return lambdas.size() * 20; }
 
     // 析构函数, delete掉 new 的四个实例

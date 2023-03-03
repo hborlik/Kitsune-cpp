@@ -19,10 +19,21 @@ int main() {
 
     printf("U + V (%f) : %f\n", u + v, s15p16_to_double(fp_u + fp_v));
     printf("U - V (%f) : %f\n", u - v, s15p16_to_double(fp_u - fp_v));
-    printf("U * V (%f) : %f\n", u * v, s15p16_to_double(fxmul_s15p16(fp_u, fp_v)));
-    printf("U / V (%f) : %f\n", u / v, s15p16_to_double(fxdiv_s15p16(fp_u, fp_v)));
+    printf("U * V (%f) : %f\n", u * v, s15p16_to_double(mul_s15p16(fp_u, fp_v)));
+    printf("U / V (%f) : %f\n", u / v, s15p16_to_double(div_s15p16(fp_u, fp_v)));
 
-    printf("U ^ V (%f) : %f\n", pow(u, v), s15p16_to_double(fxpow_s15p16(fp_u, fp_v)));
+    printf("U ^ V (%f) : %f\n", pow(u, v), s15p16_to_double(pow_s15p16(fp_u, fp_v)));
+    printf("log2_s15p16 V (%f) : %f\n", log2(v), s15p16_to_double(log2_s15p16(fp_v)));
+    printf("fixed_log2 V (%f) : %f\n", log2(v), s15p16_to_double(fixed_log2(fp_v)));
+
+    float a = 2;
+    int32_t fp_a = double_to_s15p16(a);
+    for (int i = 0; i < 100; i++) {
+        float actual = pow(a, i / 100.0);
+        int32_t fp_i = double_to_s15p16(i / 100.0);
+        float estimated = s15p16_to_double(fixed_pow_s15p16(fp_a, fp_i));
+        printf("fixed_pow %f ** %f (%f) : %f, error: %f\n", a, (float)i / 100.0, actual, estimated, actual-estimated);
+    }
 
     printf("W: %f\n", w);
 
