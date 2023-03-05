@@ -41,4 +41,12 @@ int main() {
     int32_t fx_ns = int_to_s15p16(1000000000);
     printf("Large values do not work!\n");
     printf("1000000000: raw %i, converted back %f\n", fx_ns, s15p16_to_double(fx_ns));
+
+    printf("raw %i, converted back %f\n", 1, s15p16_to_double(1));
+
+    printf("convert %f to s15p16 %i\n", 0.01f, double_to_s15p16(0.01));
+    printf("convert %f to s15p16 %i\n", 0.1f, double_to_s15p16(0.1));
+    printf("convert %f to s15p16 %i\n", 1.0f, double_to_s15p16(1.0));
+    printf("convert %f to s15p16 %i\n", 3.f, double_to_s15p16(3.0));
+    printf("convert %f to s15p16 %i\n", 5.f, double_to_s15p16(5.0));
 }

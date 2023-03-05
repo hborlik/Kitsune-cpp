@@ -14,7 +14,7 @@
 // 100ms, 500ms, 1.5sec, 10sec, and 1min
 // 100ms, 500ms, 1500ms, 10000ms, 60000ms
 // λ = 5, 3, 1, 0.1, 0.01
-static const int32_t fx_lambdas[N_INC_STATS] = {20 << 16, 33 << 16, 100 << 16, 1000 << 16, 10000 << 16}; // centiseconds
+static const int32_t fx_lambdas[N_INC_STATS] = {327680, 196608, 65536, 6554, 655}; // values converted using double_to_s15p16
 
 /* This is the data record stored in the map */
 struct datarec {
@@ -28,7 +28,7 @@ struct datarec {
 
 /* IncStat */
 struct inc_stat {
-    __u64   last_t;     // timestamp for last inserted measurement in microseconds
+    __u64   last_t;     // timestamp for last inserted measurement
 	int32_t CF1		    [N_INC_STATS];
     int32_t CF2		    [N_INC_STATS];
     int32_t w		    [N_INC_STATS];
