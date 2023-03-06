@@ -4,17 +4,16 @@
 #ifndef __XDP_STATS_KERN_H
 #define __XDP_STATS_KERN_H
 
+#include <asm-generic/int-ll64.h>
 /* Data record type 'struct datarec' is defined in common/xdp_stats_kern_user.h,
  * programs using this header must first include that file.
  */
-#ifndef __XDP_STATS_KERN_USER_H
-#warning "You forgot to #include <../common/xdp_stats_kern_user.h>"
-#include <../common/xdp_stats_kern_user.h>
-#endif
 
-#include <asm-generic/int-ll64.h>
-
+#include <xdp_stats_kern_user.h>
 #include <fixed_point.h>
+#include <bpf/bpf_helpers.h>
+
+
 
 #define BPF_STATS_MAP_TYPE BPF_MAP_TYPE_ARRAY
 
@@ -107,50 +106,14 @@ int inc_stat_insert(__u32 key, int32_t fx_value, __u64 timestamp) {
 	bpf_spin_lock(&stat->lock);
 	if (did_create) {
 		stat->last_t = timestamp;
+
+#pragma clang loop unroll(full)
 		for (__u32 i = 0; i < N_INC_STATS; ++i) {
 			stat->CF1[i] = fx_value;
 		}
 	}
 
-	// timestamp in microseconds
-	__u64 diff = (timestamp - stat->last_t) / 1000 / 1000 / 10; // time difference in centiseconds
-	// smallest value we can represent with s15p16 is 0.00001 (10E-5)
-	__u64 diff_raw = (timestamp - stat->last_t) / 1000; // microseconds 10E-6
-	__u64 diff_s = diff_raw / 1000000;
-	__u64 diff_remain = (diff_raw % 1000000) / 100; // microseconds to 10E-4 [0, 10000)
-	int32_t fx_diff_s = int_to_s15p16(diff_s);
-	fx_diff_s += div_s15p16(int_to_s15p16(diff_remain), 10000 << 16);
-	// If isTypeDiff is set, use the time difference as statistics
-	if (stat->isTypeDiff) {
-		if (diff > 0)
-			fx_value = diff;
-		else
-			fx_value = 0;
-	}
-
-	// Decay first
-    if (diff > 0) {
-#pragma clang loop unroll(full)
-        for (__u32 i = 0; i < N_INC_STATS; ++i) {
-            // Calculate the decay factor
-			int32_t fx_t 		= mul_s15p16(fx_diff_s, -fx_lambdas[i]);
-            int32_t fx_factor 	= fixed_exp2(fx_t);
-            stat->CF1[i] 	= mul_s15p16(fx_factor, stat->CF1[i]);
-            stat->CF2[i] 	= mul_s15p16(fx_factor, stat->CF2[i]);
-            stat->w[i] 		= mul_s15p16(fx_factor, stat->w[i]);
-        }
-        stat->last_t = timestamp;
-    }
-
-// 	// update with v
-// #pragma clang loop unroll(full)
-// 	for (__u32 i = 0; i < N_INC_STATS; ++i) stat->CF1[i] += fx_value;
-
-#pragma clang loop unroll(full)
-	for (__u32 i = 0; i < N_INC_STATS; ++i) stat->CF2[i] += mul_s15p16(fx_value, fx_value);
-
-#pragma clang loop unroll(full)
-	for (__u32 i = 0; i < N_INC_STATS; ++i) ++(stat->w[i]);
+	update_and_process_decay(timestamp, fx_value, stat);
 	
 	// all exec paths required to unlock
 	bpf_spin_unlock(&stat->lock);

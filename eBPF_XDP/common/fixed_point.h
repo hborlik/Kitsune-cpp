@@ -190,8 +190,8 @@ int32_t fixed_exp2 (int32_t a)
 {
     int32_t i, f, r, s;
     /* split a = i + f, such that f in [-0.5, 0.5] */
-    i = (a + 0x8000) & ~0xffff; // 0.5
-    f = a - i;   
+    i = ((a + 0x8000) & ~0xffff); // add 0.5 and clear decimal bits
+    f = a - i;
     s = ((15 << 16) - i) >> 16;
     /* minimax approximation for exp2(f) on [-0.5, 0.5] */
     r = 0x00000e20;                 // 5.5171669058037949e-2

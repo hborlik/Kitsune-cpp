@@ -78,10 +78,27 @@ int  xdp_stats_func(struct xdp_md *ctx)
 	} else if (ip_type == IPPROTO_ICMP) {
 		
 	}
-out:
 
-	if (inc_stat_insert(21, 15 << 16, timestamp) < 0)
+	int32_t fx_data = (ctx->data_end - ctx->data) << 16;
+	fx_data = div_s15p16(fx_data, 1000 << 16);
+	fx_data = div_s15p16(fx_data, 1000 << 16);
+	if (inc_stat_insert(21, fx_data, timestamp) < 0) {
 		action = XDP_ABORTED;
+		goto out;
+	}
+	if (inc_stat_insert(22, 15 << 16, timestamp) < 0) {
+		action = XDP_ABORTED;
+		goto out;
+	}
+	if (inc_stat_insert(23, 15 << 16, timestamp) < 0) {
+		action = XDP_ABORTED;
+		goto out;
+	}
+	if (inc_stat_insert(24, 15 << 16, timestamp) < 0) {
+		action = XDP_ABORTED;
+		goto out;
+	}
+out:
 
 	return xdp_stats_record_action(ctx, action);
 }

@@ -33,6 +33,8 @@
         "compare": "c",
         "ratio": "c",
         "utility": "c",
-        "xdp_stats_kern.h": "c"
+        "xdp_stats_kern.h": "c",
+        "hash_map": "cpp",
+        "ostream": "cpp"
     }
 }
