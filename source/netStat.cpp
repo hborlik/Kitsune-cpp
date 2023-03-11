@@ -83,6 +83,7 @@ IncStat::IncStat(const std::string &id, std::vector<double> *_lambdas, double in
     CF1 = new double[size];
     CF2 = new double[size];
     w = new double[size];
+    
     cur_std = new double[size];
     cur_mean = new double[size];
     cur_var = new double[size];

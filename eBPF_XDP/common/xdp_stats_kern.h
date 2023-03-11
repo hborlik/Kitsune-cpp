@@ -50,6 +50,12 @@ __u32 xdp_stats_record_action(struct xdp_md *ctx, __u32 action)
 	return action;
 }
 
+/* IncStat */
+struct inc_stat_bpf {
+	struct inc_stat stat;
+    struct bpf_spin_lock lock;
+};
+
 /* Keeps stats per session (IP, DEST, IP-DEST, and port based) */
 /*
 * BPF_MAP_TYPE_HASH
@@ -75,14 +81,14 @@ struct bpf_map_inc_stat {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, INC_STAT_MAX_ENTRIES);
 	__type(key, __u32);
-	__type(value, struct inc_stat);
+	__type(value, struct inc_stat_bpf);
 } xdp_inc_stat_map SEC(".maps");
 
 
 static const int32_t fx_w_init = 1 << 0; // smallest fx value
 static const int32_t fx_two = 2 << 16;
-static const struct inc_stat default_inc_stat = {
-	.w = {[0 ... N_INC_STATS-1] = fx_w_init}
+static const struct inc_stat_bpf default_inc_stat = {
+	.stat.w = {[0 ... N_INC_STATS-1] = fx_w_init}
 };
 
 
@@ -91,7 +97,7 @@ static __always_inline
 int inc_stat_insert(__u32 key, int32_t fx_value, __u64 timestamp) {
 	int rv = 0;
 	/* Lookup in kernel BPF-side return pointer to actual data record */
-	struct inc_stat *stat = bpf_map_lookup_elem(&xdp_inc_stat_map, &key);
+	struct inc_stat_bpf *stat = bpf_map_lookup_elem(&xdp_inc_stat_map, &key);
 	bool did_create = false;
 	if (!stat) {
 		bpf_map_update_elem(&xdp_inc_stat_map, &key, &default_inc_stat, BPF_NOEXIST); // return value not important
@@ -104,15 +110,15 @@ int inc_stat_insert(__u32 key, int32_t fx_value, __u64 timestamp) {
 
 	bpf_spin_lock(&stat->lock);
 	if (did_create) {
-		stat->last_t = timestamp;
+		stat->stat.last_t = timestamp;
 
 #pragma clang loop unroll(full)
 		for (__u32 i = 0; i < N_INC_STATS; ++i) {
-			stat->CF1[i] = fx_value;
+			stat->stat.CF1[i] = fx_value;
 		}
 	}
 
-	update_and_process_decay(timestamp, fx_value, stat);
+	update_and_process_decay(timestamp, fx_value, &(stat->stat));
 	
 	// all exec paths required to unlock
 	bpf_spin_unlock(&stat->lock);

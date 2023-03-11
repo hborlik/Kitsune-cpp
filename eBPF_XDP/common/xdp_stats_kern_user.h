@@ -8,10 +8,15 @@
 
 #include <asm-generic/int-ll64.h>
 
+#include <linux/in.h>
+#include <linux/in6.h>
 #include <stdbool.h>
 #include <stdint.h>
+
 #include "fixed_point.h"
 #include "fasthash.h"
+#include "bpf_endian.h"
+#include "parsing_helpers.h"
 
 #define INC_STAT_MAX_ENTRIES 5000
 #define N_INC_STATS 5
@@ -38,7 +43,6 @@ struct inc_stat {
     int32_t CF2		    [N_INC_STATS];
     int32_t w		    [N_INC_STATS];
     bool  isTypeDiff;
-    struct bpf_spin_lock lock;
 };
 
 struct inc_stat_features {

@@ -36,4 +36,9 @@ add_executable(xdp_tests xdp/test.c ${headers} ${common_headers} ${common})
 target_include_directories(xdp_tests PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/common ${CMAKE_CURRENT_SOURCE_DIR}/headers)
 target_link_libraries(xdp_tests PUBLIC bpf m)
 
+set( CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}-Wl,--no-undefined" )
+add_library(festats SHARED xdp/lib_stats.c ${headers} ${common_headers})
+target_include_directories(festats PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/common ${CMAKE_CURRENT_SOURCE_DIR}/headers)
+target_link_libraries(festats PUBLIC m)
+
 add_subdirectory(xdp)
