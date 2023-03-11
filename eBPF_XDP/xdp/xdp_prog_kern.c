@@ -26,18 +26,25 @@ int  xdp_stats_func(struct xdp_md *ctx)
 	void *data     = (void *)(long)ctx->data;
 	int action = XDP_PASS;
 
+	__u64 timestamp = bpf_ktime_get_ns();
 	/**
 	 * Parsing structures 
 	 */
 
 	struct ethhdr *eth;
+	struct in6_addr ipv6;
+	struct in_addr ipv4;
 	struct iphdr *iphdr;
 	struct ipv6hdr *ipv6hdr;
 	struct udphdr *udphdr;
 	struct tcphdr *tcphdr;
 	int eth_type, ip_type;
+	__u16 src_port = 0;
+	__u16 dst_port = 0;
+
 	struct hdr_cursor nh = {.pos = data};
-	__u64 timestamp = bpf_ktime_get_ns();
+
+	struct hash ph;
 
 	/* Packet parsing in steps: Get each header one at a time, aborting if
 	 * parsing fails. Each helper function does sanity checking (is the
@@ -51,21 +58,38 @@ int  xdp_stats_func(struct xdp_md *ctx)
 
 
 	if (eth_type == bpf_htons(ETH_P_IP)) {
-		ip_type = parse_iphdr(&nh, data_end, &iphdr);
+		if ((ip_type = parse_iphdr(&nh, data_end, &iphdr)) < 0) {
+			action = XDP_ABORTED;
+			goto out;
+		}
+		ipv4.s_addr = iphdr->saddr;
+		ipv4_hash(ipv4, &ph.src);
+		ipv4.s_addr = iphdr->daddr;
+		ipv4_hash(ipv4, &ph.dst);
 	} else if (eth_type == bpf_htons(ETH_P_IPV6)) {
-		ip_type = parse_ip6hdr(&nh, data_end, &ipv6hdr);
+		if ((ip_type = parse_ip6hdr(&nh, data_end, &ipv6hdr)) < 0) {
+			action = XDP_ABORTED;
+			goto out;
+		}
+		ipv6 = ipv6hdr->addrs.saddr;
+		ipv6_hash(&ipv6, &ph.src);
+		ipv6 = ipv6hdr->addrs.daddr;
+		ipv6_hash(&ipv6, &ph.dst);
 	} else { // dont know what it is
 		goto out;
 	}
 
 
 	if (ip_type == IPPROTO_UDP) {
+		
 		if (parse_udphdr(&nh, data_end, &udphdr) < 0) {
 			action = XDP_ABORTED;
 			goto out;
 		}
 		// rewrite destination port
 		// udphdr->dest = bpf_htons(bpf_ntohs(udphdr->dest) - 1);
+		src_port = bpf_ntohs(udphdr->source);
+		dst_port = bpf_ntohs(udphdr->dest);
 	} else if (ip_type == IPPROTO_TCP) {
 		if (parse_tcphdr(&nh, data_end, &tcphdr) < 0) {
 			action = XDP_ABORTED;
@@ -73,28 +97,31 @@ int  xdp_stats_func(struct xdp_md *ctx)
 		}
 		// rewrite destination port
 		// tcphdr->dest = bpf_htons(bpf_ntohs(tcphdr->dest) - 1);
+		src_port = bpf_ntohs(tcphdr->source);
+		dst_port = bpf_ntohs(tcphdr->dest);
 	} else if (ip_type == IPPROTO_ICMPV6) {
 
 	} else if (ip_type == IPPROTO_ICMP) {
 		
 	}
 
+	ph.src_port = fasthash64(&src_port, sizeof(src_port), FH_SEED);
+	ph.dst_port = fasthash64(&dst_port, sizeof(dst_port), FH_SEED);
+
+	// make a hash for the src IP:port and dst IP:port
+	__u64 tmp = 0;
+
+	tmp = hash_mix(tmp, ph.dst.vals[0]);
+	tmp = hash_mix(tmp, ph.src.vals[0]);
+	tmp = hash_mix(tmp, ph.dst_port);
+	tmp = hash_mix(tmp, ph.src_port);
+
+	__u32 hash = tmp - (tmp >> 32);
+
 	int32_t fx_data = (ctx->data_end - ctx->data) << 16;
 	fx_data = div_s15p16(fx_data, 1000 << 16);
 	fx_data = div_s15p16(fx_data, 1000 << 16);
-	if (inc_stat_insert(21, fx_data, timestamp) < 0) {
-		action = XDP_ABORTED;
-		goto out;
-	}
-	if (inc_stat_insert(22, 15 << 16, timestamp) < 0) {
-		action = XDP_ABORTED;
-		goto out;
-	}
-	if (inc_stat_insert(23, 15 << 16, timestamp) < 0) {
-		action = XDP_ABORTED;
-		goto out;
-	}
-	if (inc_stat_insert(24, 15 << 16, timestamp) < 0) {
+	if (inc_stat_insert(hash, fx_data, timestamp) < 0) {
 		action = XDP_ABORTED;
 		goto out;
 	}

@@ -6,10 +6,14 @@
 #ifndef __XDP_STATS_KERN_USER_H
 #define __XDP_STATS_KERN_USER_H
 
+#include <asm-generic/int-ll64.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 #include "fixed_point.h"
+#include "fasthash.h"
 
+#define INC_STAT_MAX_ENTRIES 5000
 #define N_INC_STATS 5
 
 // 100ms, 500ms, 1.5sec, 10sec, and 1min
@@ -88,6 +92,144 @@ int32_t update_and_process_decay(__u64 timestamp, int32_t fx_value, struct inc_s
     return 0;
 }
 
-#define INC_STAT_MAX_ENTRIES 5000
+#define FH_SEED (0x2d31e867)
+#define L3_SEED (0x6ad611c3)
+
+enum address_gen {
+	ADDRESS_IP       = 0, // /32 or /128
+	ADDRESS_NET      = 1, // /24 or /48
+	// ADDRESS_WILDCARD = 2, // /0
+};
+
+struct address_hash {
+	__u64 vals[1]; // [ADDRESS_WILDCARD]
+};
+
+struct hash {
+	struct address_hash src;
+	struct address_hash dst;
+	__u64 src_port;
+	__u64 dst_port;
+	__u32 mix_hash;
+};
+
+static __always_inline
+void ipv6_hash(const struct in6_addr *ip, struct address_hash *a)//, struct address_hash *b)
+{
+	a->vals[ADDRESS_IP]  = fasthash64(ip, sizeof(*ip), FH_SEED);
+	// b->vals[ADDRESS_IP]  = hashlittle(ip, sizeof(*ip), L3_SEED);
+	// a->vals[ADDRESS_NET] = fasthash64(ip, 48 / 8, FH_SEED);
+	// b->vals[ADDRESS_NET] = hashlittle(ip, 48 / 8, L3_SEED);
+}
+
+static __always_inline
+void ipv4_hash(struct in_addr ip, struct address_hash *a)//, struct address_hash *b)
+{
+	a->vals[ADDRESS_IP] = fasthash64(&ip, sizeof(ip), FH_SEED);
+	// b->vals[ADDRESS_IP] = hashlittle(&ip, sizeof(ip), L3_SEED);
+	// ip.s_addr &= 0xffffff00;
+	// a->vals[ADDRESS_NET] = fasthash64(&ip, sizeof(ip), FH_SEED);
+	// b->vals[ADDRESS_NET] = hashlittle(&ip, sizeof(ip), L3_SEED);
+}
+
+static __always_inline
+__u64 hash_mix(__u64 a, __u64 b)
+{
+	// Adapted from https://stackoverflow.com/a/27952689. The constant below
+	// is derived from the golden ratio.
+	a ^= b + 0x9e3779b97f4a7c15 + (a << 6) + (a >> 2);
+	return a;
+}
+
+static __always_inline
+int parse_and_hash(void *data_end, void *data, struct hash *ph) {
+	/**
+	 * Parsing structures 
+	 */
+
+	struct ethhdr *eth;
+	struct in6_addr ipv6;
+	struct in_addr ipv4;
+	struct iphdr *iphdr;
+	struct ipv6hdr *ipv6hdr;
+	struct udphdr *udphdr;
+	struct tcphdr *tcphdr;
+	int eth_type, ip_type;
+	__u16 src_port = 0;
+	__u16 dst_port = 0;
+
+	struct hdr_cursor nh = {.pos = data};
+
+	/* Packet parsing in steps: Get each header one at a time, aborting if
+	 * parsing fails. Each helper function does sanity checking (is the
+	 * header type in the packet correct?), and bounds checking.
+	 */
+	eth_type = parse_ethhdr(&nh, data_end, &eth);
+	if (eth_type < 0) {
+		return -1;
+	}
+
+
+	if (eth_type == bpf_htons(ETH_P_IP)) {
+		if ((ip_type = parse_iphdr(&nh, data_end, &iphdr)) < 0) {
+			return -1;
+		}
+		ipv4.s_addr = iphdr->saddr;
+		ipv4_hash(ipv4, &ph->src);
+		ipv4.s_addr = iphdr->daddr;
+		ipv4_hash(ipv4, &ph->dst);
+	} else if (eth_type == bpf_htons(ETH_P_IPV6)) {
+		if ((ip_type = parse_ip6hdr(&nh, data_end, &ipv6hdr)) < 0) {
+			return -1;
+		}
+		ipv6 = ipv6hdr->addrs.saddr;
+		ipv6_hash(&ipv6, &ph->src);
+		ipv6 = ipv6hdr->addrs.daddr;
+		ipv6_hash(&ipv6, &ph->dst);
+	} else { // dont know what it is
+		return -1;
+	}
+
+
+	if (ip_type == IPPROTO_UDP) {
+		
+		if (parse_udphdr(&nh, data_end, &udphdr) < 0) {
+			return -1;
+		}
+		// rewrite destination port
+		// udphdr->dest = bpf_htons(bpf_ntohs(udphdr->dest) - 1);
+		src_port = bpf_ntohs(udphdr->source);
+		dst_port = bpf_ntohs(udphdr->dest);
+	} else if (ip_type == IPPROTO_TCP) {
+		if (parse_tcphdr(&nh, data_end, &tcphdr) < 0) {
+			return -1;
+		}
+		// rewrite destination port
+		// tcphdr->dest = bpf_htons(bpf_ntohs(tcphdr->dest) - 1);
+		src_port = bpf_ntohs(tcphdr->source);
+		dst_port = bpf_ntohs(tcphdr->dest);
+	} else if (ip_type == IPPROTO_ICMPV6) {
+
+	} else if (ip_type == IPPROTO_ICMP) {
+		
+	}
+
+	ph->src_port = fasthash64(&src_port, sizeof(src_port), FH_SEED);
+	ph->dst_port = fasthash64(&dst_port, sizeof(dst_port), FH_SEED);
+
+	// make a hash for the src IP:port and dst IP:port
+	__u64 tmp = 0;
+
+	tmp = hash_mix(tmp, ph->dst.vals[0]);
+	tmp = hash_mix(tmp, ph->src.vals[0]);
+	tmp = hash_mix(tmp, ph->dst_port);
+	tmp = hash_mix(tmp, ph->src_port);
+
+	__u32 hash = tmp - (tmp >> 32);
+
+	ph->mix_hash = hash;
+
+	return 0;
+}
 
 #endif /* __XDP_STATS_KERN_USER_H */

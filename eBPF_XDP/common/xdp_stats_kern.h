@@ -4,7 +4,6 @@
 #ifndef __XDP_STATS_KERN_H
 #define __XDP_STATS_KERN_H
 
-#include <asm-generic/int-ll64.h>
 /* Data record type 'struct datarec' is defined in common/xdp_stats_kern_user.h,
  * programs using this header must first include that file.
  */
