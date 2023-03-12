@@ -52,3 +52,11 @@ update_and_process_decay = stats.stat_update_and_process_decay
 stats.stat_parse_and_hash.restype = ct.c_int
 stats.stat_parse_and_hash.argtypes = [ct.c_void_p, ct.c_void_p, ct.POINTER(hash)]
 parse_and_hash = stats.stat_parse_and_hash
+
+
+
+def ftos15p16(a : float) -> ct.c_int32:
+    return ct.c_int32(int(a * 65536.0 + ((-0.5) if (a < 0) else 0.5)))
+
+def s15p16tof(a : ct.c_int32) -> float:
+    return a / 65536.0
