@@ -124,7 +124,7 @@ void testARP() {
 int main() {
     time_t start_time = time(nullptr);
 
-    kitsuneExample();
+    kitsuneExample("../data/mirai.tsv");
 
     time_t end_time = time(nullptr);
 

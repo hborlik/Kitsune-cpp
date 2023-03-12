@@ -9,6 +9,6 @@
 
 void testDense();
 
-void kitsuneExample();
+void kitsuneExample(const char *filename);
 
 #endif //KITSUNE_CPP_TEST_H

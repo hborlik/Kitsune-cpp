@@ -9,8 +9,7 @@
 
 // Simple example of testing Kitsune
 
-void kitsuneExample() {
-    const char *filename = "D:\\Dataset\\KITSUNE\\Mirai\\Mirai_pcap.pcap.tsv";
+void kitsuneExample(const char *filename) {
     const int FM_train_num = 5000; // 
     const int AD_train_num = 50000; // 
     const int KitNET_train_num = AD_train_num + FM_train_num; // The number needed to train KitNET
