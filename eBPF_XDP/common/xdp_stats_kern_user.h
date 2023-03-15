@@ -114,7 +114,12 @@ struct hash {
 	struct address_hash dst;
 	__u64 src_port;
 	__u64 dst_port;
-	__u32 mix_hash;
+	__u64 src_mac;
+
+	__u32 srcMAC_IP;
+	__u32 srcIP;
+	__u32 srcIP_dstIP; // Channel in paper
+	__u32 full; // packet’s source and destination TCP/UDP Socket + IP
 };
 
 static __always_inline
@@ -218,20 +223,25 @@ int parse_and_hash(void *data_end, void *data, struct hash *ph) {
 		
 	}
 
+	ph->src_mac = fasthash64(eth->h_source, sizeof(eth->h_source), FH_SEED);
 	ph->src_port = fasthash64(&src_port, sizeof(src_port), FH_SEED);
 	ph->dst_port = fasthash64(&dst_port, sizeof(dst_port), FH_SEED);
 
-	// make a hash for the src IP:port and dst IP:port
+	// make a hashes
 	__u64 tmp = 0;
 
-	tmp = hash_mix(tmp, ph->dst.vals[0]);
-	tmp = hash_mix(tmp, ph->src.vals[0]);
-	tmp = hash_mix(tmp, ph->dst_port);
-	tmp = hash_mix(tmp, ph->src_port);
+	tmp = hash_mix(tmp, ph->src.vals[0]); // source IP
+	ph->srcIP = tmp - (tmp >> 32);
 
-	__u32 hash = tmp - (tmp >> 32);
+	__u64 tmp2 = hash_mix(tmp, ph->src_mac); // source IP, source MAC
+	ph->srcMAC_IP = tmp2 - (tmp2 >> 32);
 
-	ph->mix_hash = hash;
+	tmp = hash_mix(tmp, ph->dst.vals[0]); // source IP, destination IP
+	ph->srcIP_dstIP = tmp - (tmp >> 32);
+
+	tmp = hash_mix(tmp, ph->src_port); // source IP, destination IP, src port
+	tmp = hash_mix(tmp, ph->dst_port); // source IP, destination IP, src port, dst port
+	ph->full = tmp - (tmp >> 32);
 
 	return 0;
 }

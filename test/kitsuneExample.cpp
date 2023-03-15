@@ -24,19 +24,22 @@ void kitsuneExample(const char *filename) {
     auto *x = new double[sz]; // Initialize the buffer to store the input feature vectors
 
     FILE *fp = fopen("RMSE.txt", "w");
+    FILE *fpt = fopen("RMSET.txt", "w");
     int now_packet = 0;
-    while (fe->nextVector(x)) {
+    while (fe->nextVector(x) == sz) {
         ++now_packet;
-        if (now_packet <= KitNET_train_num)
-            fprintf(fp, "%.15f\n", kitNET->train(x));
-        else
+        if (now_packet <= KitNET_train_num) {
+            fprintf(fpt, "%.15f\n", kitNET->train(x));
+        } else {
             fprintf(fp, "%.15f\n", kitNET->execute(x));
+        }
 
         if (now_packet % 1000 == 0)printf("%d\n", now_packet);
     }
 
     printf("total packets is %d\n", now_packet);
     fclose(fp);
+    fclose(fpt);
     delete[] x;
     delete fe;
     delete kitNET;

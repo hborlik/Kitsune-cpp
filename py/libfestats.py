@@ -32,7 +32,13 @@ class address_hash(ct.Structure):
 # 	struct address_hash dst;
 # 	__u64 src_port;
 # 	__u64 dst_port;
-# 	__u32 mix_hash;
+#   __u64 src_mac;
+
+# 	__u32 srcMAC_IP;
+# 	__u32 srcIP;
+# 	__u32 srcIP_dstIP; // Channel in paper
+#	__u32 full; // packet’s source and destination TCP/UDP Socket + IP
+
 # };
 class hash(ct.Structure):
     _fields_ = [
@@ -40,7 +46,11 @@ class hash(ct.Structure):
             ('dst', address_hash),
             ('src_port', ct.c_ulonglong),
             ('dst_port', ct.c_ulonglong),
-            ('mix_hash', ct.c_int32),
+            ('src_mac', ct.c_ulonglong),
+            ('srcMAC_IP', ct.c_int32),
+            ('srcIP', ct.c_int32),
+            ('srcIP_dstIP', ct.c_int32),
+            ('full', ct.c_int32),
         ]
 
 # int stat_update_and_process_decay(__u64 timestamp, int32_t fx_value, struct inc_stat *stat)
