@@ -114,7 +114,7 @@ AE::~AE() {
 
 
 // rebuild, returns the reconstructed value
-double AE::reconstruct(const double *x) {
+double AE::reconstruct(const double *x) const {
     normalize(x); // First normalize and save in tmp_x
 
     encoder->feedForward(tmp_x, tmp_y); // Encoding, stored in tmp_y
@@ -145,6 +145,12 @@ void AE::normalize(const double *x) {
     for (int i = 0; i < visible_size; ++i) {
         min_v[i] = std::min(x[i], min_v[i]);
         max_v[i] = std::max(x[i], max_v[i]);
+        tmp_x[i] = (x[i] - min_v[i]) / (max_v[i] - min_v[i] + 1e-13);
+    }
+}
+
+void AE::normalize(const double *x) const {
+    for (int i = 0; i < visible_size; ++i) {
         tmp_x[i] = (x[i] - min_v[i]) / (max_v[i] - min_v[i] + 1e-13);
     }
 }

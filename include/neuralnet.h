@@ -68,13 +68,15 @@ private:
     // 0-1 normalization, the result is saved in tmp_x
     void normalize(const double *x);
 
+    void normalize(const double *x) const;
+
 public:
     // Constructor, the parameter is the number of visible layer, hidden layer, learning rate, default 0.01
     AE(int v_sz, int h_sz, double _learning_rate = 0.01);
     ~AE();
 
     // reconstruction, returns the root mean error of the reconstruction
-    double reconstruct(const double *x);
+    double reconstruct(const double *x) const;
 
     // training, returns the root mean error of the reconstruction
     double train(const double *x);
